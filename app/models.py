@@ -51,7 +51,11 @@ class Wallet(Base):
     
     # Relationships
     user = relationship("User", back_populates="wallet")
-    transactions = relationship("Transaction", back_populates="wallet")
+    transactions = relationship(
+        "Transaction", 
+        primaryjoin="Wallet.id == Transaction.wallet_id",
+        back_populates="wallet"
+    )
 
 
 class Transaction(Base):
