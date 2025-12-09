@@ -1,0 +1,4 @@
+"""
+Wallet Service Application
+"""
+
