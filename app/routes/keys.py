@@ -44,7 +44,22 @@ def generate_api_key() -> str:
     status_code=201,
     dependencies=[Depends(get_current_user)],
     summary="Create API Key",
-    description="Create a new API key with specified permissions. Maximum 5 active keys per user."
+    description=(
+        "Creates a new API key you can use instead of a JWT.\n"
+        "Simple steps for non-technical users:\n"
+        "1) Make sure you are logged in (use the Authorize button with your JWT token).\n"
+        "2) Click 'Try it out'.\n"
+        "3) Fill the body:\n"
+        "   - name: any label you like (e.g., 'my service key')\n"
+        "   - permissions: MUST include what you need! Options: 'deposit', 'transfer', 'read'\n"
+        "     * To deposit money: MUST include 'deposit'\n"
+        "     * To transfer money: MUST include 'transfer'\n"
+        "     * To view balance/transactions: MUST include 'read'\n"
+        "     * You can include all: ['deposit', 'transfer', 'read']\n"
+        "   - expiry: how long it lasts (1H = 1 hour, 1D = 1 day, 1M = 1 month, 1Y = 1 year)\n"
+        "4) Click Execute and copy the 'api_key' value from the response.\n"
+        "Note: You can have at most 5 active keys at once."
+    )
 )
 async def create_api_key(
     request: CreateAPIKeyRequest,
@@ -107,7 +122,22 @@ async def create_api_key(
     )
 
 
-@router.post("/rollover", response_model=CreateAPIKeyResponse, status_code=201)
+@router.post(
+    "/rollover",
+    response_model=CreateAPIKeyResponse,
+    status_code=201,
+    dependencies=[Depends(get_current_user)],
+    summary="Rollover Expired API Key",
+    description=(
+        "Creates a fresh API key using the same permissions as an expired one.\n"
+        "Steps:\n"
+        "1) Make sure you are logged in (Authorize with JWT).\n"
+        "2) Provide the expired key ID or the key value in 'expired_key_id'.\n"
+        "3) Choose a new expiry (1H, 1D, 1M, 1Y).\n"
+        "4) Execute and copy the new 'api_key'.\n"
+        "Note: Only works if the key is actually expired."
+    )
+)
 async def rollover_api_key(
     request: RolloverAPIKeyRequest,
     current_user: AuthUser = Depends(get_current_user),

@@ -13,12 +13,18 @@ from app.schemas import GoogleAuthResponse, JWTAuthResponse
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-@router.get("/google")
+@router.get(
+    "/google",
+    summary="Start Google Sign‑In",
+    description=(
+        "Returns a Google login link. Steps for non‑technical users:\n"
+        "1) Click 'Try it out' → Execute.\n"
+        "2) Copy the 'google_auth_url' value from the response.\n"
+        "3) Open that link in your browser and sign in with Google.\n"
+        "4) After signing in, you will be redirected back to this API and the next step (/auth/google/callback) will return your login details."
+    ),
+)
 async def trigger_google_signin(request: Request):
-    """
-    Trigger Google sign-in flow
-    Returns redirect to Google OAuth or JSON with URL
-    """
     auth_url = get_google_auth_url()
     
     # Check if client wants JSON response
@@ -30,16 +36,21 @@ async def trigger_google_signin(request: Request):
     return RedirectResponse(url=auth_url, status_code=302)
 
 
-@router.get("/google/callback")
+@router.get(
+    "/google/callback",
+    summary="Complete Google Sign‑In and Get Token",
+    description=(
+        "You normally arrive here automatically after logging in with the link from /auth/google.\n"
+        "What you get back:\n"
+        "- token: your login token (JWT)\n"
+        "- user_id, email, name: your account details\n\n"
+        "If you got the login link from /auth/google and signed in, just look at the response here and copy the 'token' value."
+    ),
+)
 async def google_oauth_callback(
     code: Optional[str] = None,
     db: Session = Depends(get_db)
 ) -> JWTAuthResponse:
-    """
-    Google OAuth callback
-    Exchange code for token, fetch user info, create/update user
-    Returns JWT token
-    """
     if not code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

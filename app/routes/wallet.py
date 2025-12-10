@@ -43,7 +43,15 @@ router = APIRouter(prefix="/wallet", tags=["Wallet"])
     status_code=201,
     dependencies=[Depends(require_permission("deposit"))],
     summary="Deposit Funds",
-    description="Initiate wallet deposit using Paystack. Requires 'deposit' permission."
+    description=(
+        "Start a Paystack payment to add money to your wallet.\n"
+        "For non-technical users:\n"
+        "1) Click 'Try it out'.\n"
+        "2) Enter amount in kobo (e.g., 5000 = ₦50).\n"
+        "3) Execute. Copy the 'authorization_url'.\n"
+        "4) Open that URL in a new tab and complete payment.\n"
+        "5) Your wallet is credited when Paystack webhook confirms the payment."
+    )
 )
 async def deposit_funds(
     request: DepositRequest,
@@ -118,7 +126,201 @@ async def deposit_funds(
         )
 
 
-@router.post("/paystack/webhook", response_model=WebhookResponse)
+@router.get("/paystack/callback")
+async def paystack_callback(
+    reference: str,
+    trxref: str = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Paystack payment callback (user redirect after payment)
+    This is where Paystack redirects users after they complete payment.
+    Shows a success/failure message to the user.
+    Note: The actual wallet crediting happens via webhook, not here.
+    """
+    from fastapi.responses import HTMLResponse
+    
+    # Verify transaction status
+    transaction = get_transaction_by_reference(reference, db)
+    
+    if transaction:
+        if transaction.status == TransactionStatus.SUCCESS:
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Payment Successful</title>
+                <style>
+                    body {{
+                        font-family: Arial, sans-serif;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        height: 100vh;
+                        margin: 0;
+                        background-color: #f5f5f5;
+                    }}
+                    .container {{
+                        text-align: center;
+                        background: white;
+                        padding: 40px;
+                        border-radius: 10px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    }}
+                    .success {{
+                        color: #28a745;
+                        font-size: 48px;
+                        margin-bottom: 20px;
+                    }}
+                    h1 {{
+                        color: #333;
+                        margin-bottom: 10px;
+                    }}
+                    p {{
+                        color: #666;
+                        margin: 10px 0;
+                    }}
+                    .reference {{
+                        background: #f8f9fa;
+                        padding: 10px;
+                        border-radius: 5px;
+                        font-family: monospace;
+                        margin: 20px 0;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="success">✓</div>
+                    <h1>Payment Successful!</h1>
+                    <p>Your payment has been processed successfully.</p>
+                    <p>Reference: <span class="reference">{reference}</span></p>
+                    <p>Amount: ₦{transaction.amount:,.2f}</p>
+                    <p style="margin-top: 30px; color: #999; font-size: 14px;">
+                        Your wallet will be credited shortly. You can close this window.
+                    </p>
+                </div>
+            </body>
+            </html>
+            """
+            return HTMLResponse(content=html_content)
+        elif transaction.status == TransactionStatus.FAILED:
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Payment Failed</title>
+                <style>
+                    body {{
+                        font-family: Arial, sans-serif;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        height: 100vh;
+                        margin: 0;
+                        background-color: #f5f5f5;
+                    }}
+                    .container {{
+                        text-align: center;
+                        background: white;
+                        padding: 40px;
+                        border-radius: 10px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    }}
+                    .error {{
+                        color: #dc3545;
+                        font-size: 48px;
+                        margin-bottom: 20px;
+                    }}
+                    h1 {{
+                        color: #333;
+                        margin-bottom: 10px;
+                    }}
+                    p {{
+                        color: #666;
+                        margin: 10px 0;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="error">✗</div>
+                    <h1>Payment Failed</h1>
+                    <p>Your payment could not be processed.</p>
+                    <p>Reference: <span style="font-family: monospace; background: #f8f9fa; padding: 5px 10px; border-radius: 3px;">{reference}</span></p>
+                    <p style="margin-top: 30px; color: #999; font-size: 14px;">
+                        Please try again or contact support.
+                    </p>
+                </div>
+            </body>
+            </html>
+            """
+            return HTMLResponse(content=html_content)
+    
+    # Transaction not found or still pending
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Payment Processing</title>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+                background-color: #f5f5f5;
+            }}
+            .container {{
+                text-align: center;
+                background: white;
+                padding: 40px;
+                border-radius: 10px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }}
+            .pending {{
+                color: #ffc107;
+                font-size: 48px;
+                margin-bottom: 20px;
+            }}
+            h1 {{
+                color: #333;
+                margin-bottom: 10px;
+            }}
+            p {{
+                color: #666;
+                margin: 10px 0;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="pending">⏳</div>
+            <h1>Payment Processing</h1>
+            <p>Your payment is being processed.</p>
+            <p>Reference: <span style="font-family: monospace; background: #f8f9fa; padding: 5px 10px; border-radius: 3px;">{reference}</span></p>
+            <p style="margin-top: 30px; color: #999; font-size: 14px;">
+                Please wait while we confirm your payment. You can check the status later.
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
+
+@router.post(
+    "/paystack/webhook",
+    response_model=WebhookResponse,
+    summary="Paystack Webhook (automatic)",
+    description=(
+        "This is called by Paystack automatically after payment.\n"
+        "You do NOT need to trigger this manually.\n"
+        "It validates the signature and credits the wallet if the payment succeeded."
+    )
+)
 async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
     """
     Paystack webhook endpoint
@@ -163,7 +365,18 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
         )
 
 
-@router.get("/deposit/{reference}/status", response_model=DepositStatusResponse)
+@router.get(
+    "/deposit/{reference}/status",
+    response_model=DepositStatusResponse,
+    summary="Check Deposit Status",
+    description=(
+        "Check if a deposit is pending, success, or failed.\n"
+        "Steps:\n"
+        "1) Get the 'reference' from the deposit response.\n"
+        "2) Paste it here and Execute.\n"
+        "Note: This does NOT credit your wallet; only the webhook does."
+    )
+)
 async def get_deposit_status(
     reference: str,
     current_user: AuthUser = Depends(require_permission("read")),
@@ -217,7 +430,7 @@ async def get_deposit_status(
     response_model=WalletBalanceResponse,
     dependencies=[Depends(require_permission("read"))],
     summary="Get Wallet Balance",
-    description="Get current wallet balance. Requires 'read' permission."
+    description="Shows your current wallet balance. Click 'Try it out' → 'Execute'."
 )
 async def get_balance(
     current_user: AuthUser = Depends(require_permission("read")),
@@ -237,7 +450,19 @@ async def get_balance(
         )
 
 
-@router.post("/transfer", response_model=TransferResponse)
+@router.post(
+    "/transfer",
+    response_model=TransferResponse,
+    summary="Transfer to Another Wallet",
+    description=(
+        "Send money to another user's wallet.\n"
+        "Steps:\n"
+        "1) Click 'Try it out'.\n"
+        "2) Enter the recipient 'wallet_number'.\n"
+        "3) Enter amount in kobo (e.g., 1000 = ₦10).\n"
+        "4) Execute. You need enough balance and the 'transfer' permission."
+    )
+)
 async def transfer_funds_to_wallet(
     request: TransferRequest,
     current_user: AuthUser = Depends(require_permission("transfer")),
@@ -292,7 +517,18 @@ async def transfer_funds_to_wallet(
         )
 
 
-@router.get("/transactions", response_model=list[TransactionResponse])
+@router.get(
+    "/transactions",
+    response_model=list[TransactionResponse],
+    summary="Transaction History",
+    description=(
+        "See your deposits, transfers, and received transactions.\n"
+        "Steps:\n"
+        "1) Click 'Try it out'.\n"
+        "2) Optionally set 'limit' (max 100) and 'offset' for paging.\n"
+        "3) Execute to view your history."
+    )
+)
 async def get_transactions(
     limit: int = 50,
     offset: int = 0,
