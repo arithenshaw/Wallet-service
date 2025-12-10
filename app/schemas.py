@@ -29,7 +29,7 @@ class CreateAPIKeyRequest(BaseModel):
 
 
 class CreateAPIKeyResponse(BaseModel):
-    api_key_id: int
+    api_key_id: str  # Random hex string (12 characters)
     api_key: str
     expires_at: datetime
 
@@ -40,7 +40,7 @@ class RolloverAPIKeyRequest(BaseModel):
 
 
 class APIKeyInfo(BaseModel):
-    id: int
+    id: str  # Random hex string (12 characters)
     name: str
     api_key: str  # Masked/encrypted version
     permissions: List[str]

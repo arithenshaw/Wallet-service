@@ -38,6 +38,11 @@ def generate_api_key() -> str:
     return f"{settings.API_KEY_PREFIX}{random_part}"
 
 
+def generate_api_key_id() -> str:
+    """Generate a random hexadecimal ID (12 characters)"""
+    return secrets.token_hex(6)  # 6 bytes = 12 hex characters
+
+
 @router.post(
     "/create", 
     response_model=CreateAPIKeyResponse, 
@@ -101,11 +106,17 @@ async def create_api_key(
             detail=str(e)
         )
     
-    # Generate API key
+    # Generate API key and ID
     api_key = generate_api_key()
+    api_key_id = generate_api_key_id()
+    
+    # Ensure ID is unique
+    while db.query(APIKey).filter(APIKey.id == api_key_id).first():
+        api_key_id = generate_api_key_id()
     
     # Create API key record
     api_key_obj = APIKey(
+        id=api_key_id,
         user_id=current_user.user_id,
         key=api_key,
         name=request.name,
@@ -148,11 +159,12 @@ async def rollover_api_key(
     Rollover an expired API key
     Creates a new key with the same permissions as the expired one
     """
-    # Find the expired key - try by ID first, then by key string
+    # Find the expired key - try by ID first (hex string, 12 characters), then by key string
     expired_key = None
-    if request.expired_key_id.isdigit():
+    # Try finding by ID (hex string, 12 characters)
+    if len(request.expired_key_id) == 12 and all(c in '0123456789abcdef' for c in request.expired_key_id.lower()):
         expired_key = db.query(APIKey).filter(
-            APIKey.id == int(request.expired_key_id),
+            APIKey.id == request.expired_key_id.lower(),
             APIKey.user_id == current_user.user_id
         ).first()
     
@@ -214,11 +226,17 @@ async def rollover_api_key(
         except:
             permissions = []
     
-    # Generate new API key
+    # Generate new API key and ID
     api_key = generate_api_key()
+    api_key_id = generate_api_key_id()
+    
+    # Ensure ID is unique
+    while db.query(APIKey).filter(APIKey.id == api_key_id).first():
+        api_key_id = generate_api_key_id()
     
     # Create new API key with same permissions
     new_api_key = APIKey(
+        id=api_key_id,
         user_id=current_user.user_id,
         key=api_key,
         name=f"{expired_key.name} (rolled over)",

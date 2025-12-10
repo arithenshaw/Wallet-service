@@ -83,7 +83,7 @@ class Transaction(Base):
 class APIKey(Base):
     __tablename__ = "api_keys"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String, primary_key=True, index=True)  # Random hex string (12 chars)
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
     key = Column(String, unique=True, index=True)  # The actual API key
     name = Column(String)  # User-friendly name
