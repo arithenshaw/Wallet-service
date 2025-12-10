@@ -37,7 +37,14 @@ from app.schemas import (
 router = APIRouter(prefix="/wallet", tags=["Wallet"])
 
 
-@router.post("/deposit", response_model=DepositResponse, status_code=201)
+@router.post(
+    "/deposit", 
+    response_model=DepositResponse, 
+    status_code=201,
+    dependencies=[Depends(require_permission("deposit"))],
+    summary="Deposit Funds",
+    description="Initiate wallet deposit using Paystack. Requires 'deposit' permission."
+)
 async def deposit_funds(
     request: DepositRequest,
     current_user: AuthUser = Depends(require_permission("deposit")),
@@ -205,7 +212,13 @@ async def get_deposit_status(
     )
 
 
-@router.get("/balance", response_model=WalletBalanceResponse)
+@router.get(
+    "/balance", 
+    response_model=WalletBalanceResponse,
+    dependencies=[Depends(require_permission("read"))],
+    summary="Get Wallet Balance",
+    description="Get current wallet balance. Requires 'read' permission."
+)
 async def get_balance(
     current_user: AuthUser = Depends(require_permission("read")),
     db: Session = Depends(get_db),

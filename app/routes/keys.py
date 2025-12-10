@@ -38,7 +38,14 @@ def generate_api_key() -> str:
     return f"{settings.API_KEY_PREFIX}{random_part}"
 
 
-@router.post("/create", response_model=CreateAPIKeyResponse, status_code=201)
+@router.post(
+    "/create", 
+    response_model=CreateAPIKeyResponse, 
+    status_code=201,
+    dependencies=[Depends(get_current_user)],
+    summary="Create API Key",
+    description="Create a new API key with specified permissions. Maximum 5 active keys per user."
+)
 async def create_api_key(
     request: CreateAPIKeyRequest,
     current_user: AuthUser = Depends(get_current_user),

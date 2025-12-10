@@ -32,6 +32,57 @@ app.include_router(auth.router)
 app.include_router(keys.router)
 app.include_router(wallet.router)
 
+# Add security schemes to OpenAPI schema (must be after routers are included)
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    from fastapi.openapi.utils import get_openapi
+    
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    
+    # Add security schemes
+    openapi_schema["components"]["securitySchemes"] = {
+        "Bearer": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "Enter JWT token from Google OAuth callback. Format: Bearer <token>"
+        },
+        "APIKey": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "x-api-key",
+            "description": "Enter API key (starts with sk_live_)"
+        }
+    }
+    
+    # Add security to protected endpoints
+    public_paths = ["/", "/health", "/auth/google", "/auth/google/callback", "/wallet/paystack/webhook"]
+    
+    for path, path_item in openapi_schema.get("paths", {}).items():
+        for method, operation in path_item.items():
+            if method in ["post", "get", "put", "delete", "patch"]:
+                # Skip public endpoints
+                if path in public_paths:
+                    continue
+                # Add security requirements
+                if "security" not in operation:
+                    operation["security"] = [
+                        {"Bearer": []},
+                        {"APIKey": []}
+                    ]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
+
 
 @app.get("/")
 async def root():
