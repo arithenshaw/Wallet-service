@@ -29,6 +29,7 @@ class CreateAPIKeyRequest(BaseModel):
 
 
 class CreateAPIKeyResponse(BaseModel):
+    api_key_id: int
     api_key: str
     expires_at: datetime
 
@@ -41,6 +42,7 @@ class RolloverAPIKeyRequest(BaseModel):
 class APIKeyInfo(BaseModel):
     id: int
     name: str
+    api_key: str  # Masked/encrypted version
     permissions: List[str]
     expires_at: datetime
     is_revoked: bool

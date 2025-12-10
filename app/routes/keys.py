@@ -11,7 +11,7 @@ import secrets
 from app.database import get_db
 from app.middleware.auth import get_current_user, AuthUser
 from app.models import APIKey
-from app.schemas import CreateAPIKeyRequest, CreateAPIKeyResponse, RolloverAPIKeyRequest
+from app.schemas import CreateAPIKeyRequest, CreateAPIKeyResponse, RolloverAPIKeyRequest, APIKeyInfo
 from app.config import settings
 
 router = APIRouter(prefix="/keys", tags=["API Keys"])
@@ -117,6 +117,7 @@ async def create_api_key(
     db.refresh(api_key_obj)
     
     return CreateAPIKeyResponse(
+        api_key_id=api_key_obj.id,
         api_key=api_key,
         expires_at=expires_at,
     )
@@ -229,7 +230,77 @@ async def rollover_api_key(
     db.refresh(new_api_key)
     
     return CreateAPIKeyResponse(
+        api_key_id=new_api_key.id,
         api_key=api_key,
         expires_at=expires_at,
     )
+
+
+@router.get(
+    "/list",
+    response_model=List[APIKeyInfo],
+    summary="List All API Keys",
+    description=(
+        "Get a list of all your API keys (active, expired, and revoked).\n"
+        "Steps:\n"
+        "1) Make sure you're logged in (use Authorize button with JWT token).\n"
+        "2) Click 'Try it out' → 'Execute'.\n"
+        "3) View all your keys with their status.\n"
+        "4) Use the 'id' field from expired keys for rollover."
+    )
+)
+async def list_api_keys(
+    current_user: AuthUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    List all API keys for the current user
+    Returns active, expired, and revoked keys
+    Use this to find expired key IDs for rollover
+    """
+    api_keys = db.query(APIKey).filter(
+        APIKey.user_id == current_user.user_id
+    ).order_by(APIKey.created_at.desc()).all()
+    
+    result = []
+    for key in api_keys:
+        permissions = []
+        if key.permissions:
+            try:
+                permissions = json.loads(key.permissions)
+            except:
+                permissions = []
+        
+        # Mask the API key for security (show only first 8 and last 4 characters)
+        masked_key = mask_api_key(key.key)
+        
+        result.append(APIKeyInfo(
+            id=key.id,
+            name=key.name,
+            api_key=masked_key,
+            permissions=permissions,
+            expires_at=key.expires_at,
+            is_revoked=key.is_revoked,
+            is_expired=key.is_expired,
+            created_at=key.created_at,
+        ))
+    
+    return result
+
+
+def mask_api_key(api_key: str) -> str:
+    """
+    Mask API key for display - shows only first 8 and last 4 characters
+    Example: sk_live_abc123...xyz9
+    """
+    if len(api_key) <= 12:
+        # If key is too short, mask everything except first 4 chars
+        return api_key[:4] + "..." + "*" * (len(api_key) - 4)
+    
+    # Show first 8 characters and last 4 characters
+    prefix = api_key[:8]
+    suffix = api_key[-4:]
+    masked_length = len(api_key) - 12  # Total length minus visible parts
+    
+    return f"{prefix}{'*' * min(masked_length, 20)}...{suffix}"
 
