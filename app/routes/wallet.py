@@ -22,7 +22,7 @@ from app.services.wallet_service import (
     get_transaction_history,
     get_transaction_by_reference,
 )
-from app.models import User, Transaction, TransactionStatus
+from app.models import User, Transaction, TransactionStatus, Wallet
 from app.schemas import (
     DepositRequest,
     DepositResponse,
@@ -442,7 +442,14 @@ async def get_balance(
     """
     try:
         balance = get_wallet_balance(current_user.user_id, db)
-        return WalletBalanceResponse(balance=balance)
+        # Get wallet number
+        wallet = db.query(Wallet).filter(Wallet.user_id == current_user.user_id).first()
+        if not wallet:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Wallet not found"
+            )
+        return WalletBalanceResponse(balance=balance, wallet_number=wallet.wallet_number)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

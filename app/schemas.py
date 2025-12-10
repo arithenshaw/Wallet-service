@@ -18,6 +18,7 @@ class JWTAuthResponse(BaseModel):
     user_id: int
     email: str
     name: str
+    wallet_number: Optional[str] = None
 
 
 # API Key Schemas
@@ -65,6 +66,7 @@ class DepositStatusResponse(BaseModel):
 
 class WalletBalanceResponse(BaseModel):
     balance: Decimal
+    wallet_number: str
 
 
 class TransferRequest(BaseModel):
@@ -86,6 +88,7 @@ class TransactionResponse(BaseModel):
     status: str
     description: Optional[str] = None
     created_at: datetime
+    wallet_number: Optional[str] = None
     
     class Config:
         from_attributes = True

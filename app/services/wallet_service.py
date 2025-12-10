@@ -156,6 +156,10 @@ def get_transaction_history(
         Transaction.created_at.desc()
     ).limit(limit).offset(offset).all()
     
+    # Get user's wallet number
+    wallet = db.query(Wallet).filter(Wallet.user_id == user_id).first()
+    wallet_number = wallet.wallet_number if wallet else None
+    
     return [
         TransactionResponse(
             id=t.id,
@@ -165,6 +169,7 @@ def get_transaction_history(
             status=t.status.value,
             description=t.description,
             created_at=t.created_at,
+            wallet_number=wallet_number,
         )
         for t in transactions
     ]

@@ -127,6 +127,10 @@ async def handle_google_callback(code: str, db: Session) -> JWTAuthResponse:
     db.commit()
     db.refresh(user)
     
+    # Get wallet number
+    wallet = db.query(Wallet).filter(Wallet.user_id == user.id).first()
+    wallet_number = wallet.wallet_number if wallet else None
+    
     # Generate JWT token
     token = create_jwt_token(user.id, user.email)
     
@@ -135,6 +139,7 @@ async def handle_google_callback(code: str, db: Session) -> JWTAuthResponse:
         user_id=user.id,
         email=user.email,
         name=user.name,
+        wallet_number=wallet_number,
     )
 
 
