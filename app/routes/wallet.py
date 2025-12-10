@@ -418,10 +418,19 @@ async def get_deposit_status(
         except:
             pass  # If verification fails, return current status
     
+    # Generate message based on status
+    if transaction.status == TransactionStatus.SUCCESS:
+        message = f"{transaction.amount:,.2f} Naira added to your wallet successfully"
+    elif transaction.status == TransactionStatus.FAILED:
+        message = "Failed transaction, please try again in the next 2 minutes"
+    else:  # PENDING
+        message = "Transaction is being processed, please wait"
+    
     return DepositStatusResponse(
         reference=transaction.reference,
         status=transaction.status.value,
         amount=transaction.amount,
+        message=message,
     )
 
 
@@ -496,7 +505,7 @@ async def transfer_funds_to_wallet(
         
         return TransferResponse(
             status="success",
-            message="Transfer completed",
+            message=f"{amount_naira:,.2f} Naira transferred to {request.wallet_number}",
             reference=transaction.reference,
         )
     

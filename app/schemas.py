@@ -62,6 +62,7 @@ class DepositStatusResponse(BaseModel):
     reference: str
     status: str
     amount: Decimal
+    message: str
 
 
 class WalletBalanceResponse(BaseModel):
